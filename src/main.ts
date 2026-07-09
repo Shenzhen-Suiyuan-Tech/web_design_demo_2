@@ -10,6 +10,10 @@ gsap.registerPlugin(ScrollTrigger);
 // regardless of how many frames a given sequence actually has.
 const SCROLL_VH_PER_FRAME = 4 / 150;
 
+// Section 2 gets twice as much scroll distance per frame as section 1 -
+// same frame sequence, but the viewer spends twice as long moving through it.
+const S2_SCROLL_MULTIPLIER = 2;
+
 function lerp(a: number, b: number, t: number) {
   return a + (b - a) * t;
 }
@@ -73,6 +77,7 @@ const textTop = document.querySelector(".text-top") as HTMLDivElement;
 const textBottom = document.querySelector(".text-bottom") as HTMLDivElement;
 const textSecond = document.querySelector(".text-second") as HTMLParagraphElement;
 const textSecondRight = document.querySelector(".text-second-right") as HTMLParagraphElement;
+const textThird = document.querySelector(".text-third") as HTMLParagraphElement;
 const titleEl = textTop.querySelector(".hero-title") as HTMLElement;
 const subtitleEl = textTop.querySelector(".hero-subtitle") as HTMLElement;
 
@@ -130,6 +135,7 @@ const S2_FRAME_COUNT = 150;
 const S2_MAX_BLUR = 28;
 const S2_CLEAR_BY = frameToProgress(51, S2_FRAME_COUNT);
 const S2_REVEAL_END = frameToProgress(20, S2_FRAME_COUNT);
+const S2_FADE_TO_BLACK_START = frameToProgress(131, S2_FRAME_COUNT);
 
 // Text choreography frame marks (see spec: content text consolidates under
 // the subtitle, the whole first-batch group rises and fades, then a second
@@ -191,9 +197,11 @@ function updateSection2(progress: number) {
   // Section 2 is already fully "arrived" the instant section 1 ends - it
   // doesn't need extra scrolling to reveal itself. It just starts as pure
   // black (matching section 1's dissolved end state) and fades in over the
-  // first 20 frames, independent of the longer focus-pull blur above.
+  // first 20 frames, independent of the longer focus-pull blur above. It
+  // then fades back to black over the last 20 frames to close the sequence.
   const revealT = clamp(progress / S2_REVEAL_END, 0, 1);
-  s2Canvas.style.opacity = `${revealT}`;
+  const fadeToBlackT = clamp((progress - S2_FADE_TO_BLACK_START) / (1 - S2_FADE_TO_BLACK_START), 0, 1);
+  s2Canvas.style.opacity = `${revealT * (1 - fadeToBlackT)}`;
 
   // Phase 1 (frame 1-20): content text rises to sit just under the subtitle.
   const consolidateT = clamp(progress / P_CONSOLIDATE_END, 0, 1);
@@ -237,12 +245,65 @@ function updateSection2(progress: number) {
 }
 
 // ---------------------------------------------------------------------------
+// Section 3: white-eggs still image, scroll-scrubbed width + parallax text
+// ---------------------------------------------------------------------------
+
+// The wrap is a normal (unpinned) 100vh block, so its own entrance and exit
+// come for free from ordinary document flow: scrolling it from fully below
+// the viewport to top-at-top takes exactly one viewport height, and from
+// top-at-top to fully above takes another. A single ScrollTrigger spanning
+// "top bottom" -> "bottom top" therefore gives one continuous 0-1 progress
+// where 0.5 lands exactly on "top reaches the top of the screen".
+const S3_TOP_REACHED = 0.5;
+// "90% exited": 90% of a further one-viewport-height exit, i.e. 0.5 + 0.9 * 0.5.
+const S3_MOSTLY_EXITED = S3_TOP_REACHED + 0.9 * (1 - S3_TOP_REACHED);
+
+const S3_TEXT_FADE_IN_START = S3_TOP_REACHED * 0.5; // image 50% slid in
+const S3_TEXT_FADE_IN_END = S3_TOP_REACHED * 0.75; // image 75% slid in
+
+const s3ImageWrap = document.getElementById("section3-image-wrap") as HTMLDivElement;
+
+let s3TextInitialTopPx = 0;
+let s3TextTargetTopPx = 0;
+
+function measureSection3Layout() {
+  const textHeight = textThird.getBoundingClientRect().height;
+  s3TextInitialTopPx = window.innerHeight - window.innerHeight / 4 - textHeight;
+  s3TextTargetTopPx = (window.innerHeight * 2) / 5;
+}
+
+function updateSection3(progress: number) {
+  let widthVw: number;
+  if (progress <= S3_TOP_REACHED) {
+    widthVw = lerp(130, 120, progress / S3_TOP_REACHED);
+  } else {
+    const t = clamp((progress - S3_TOP_REACHED) / (S3_MOSTLY_EXITED - S3_TOP_REACHED), 0, 1);
+    widthVw = lerp(120, 100, t);
+  }
+  s3ImageWrap.style.width = `${widthVw}vw`;
+
+  const fadeT = clamp(
+    (progress - S3_TEXT_FADE_IN_START) / (S3_TEXT_FADE_IN_END - S3_TEXT_FADE_IN_START),
+    0,
+    1,
+  );
+  textThird.style.opacity = `${fadeT}`;
+
+  // Constant speed throughout: the same per-progress rate established while
+  // sliding up to the target continues unchanged as it slides back out.
+  const top = lerp(s3TextInitialTopPx, s3TextTargetTopPx, progress / S3_TOP_REACHED);
+  textThird.style.top = `${top}px`;
+}
+
+// ---------------------------------------------------------------------------
 
 async function init() {
   resizeCanvas(s1Canvas, s1Ctx);
   resizeCanvas(s2Canvas, s2Ctx);
   measureTextLayout();
+  measureSection3Layout();
   updateSection1(0);
+  updateSection3(0);
 
   let s1Loaded = 0;
   let s2Loaded = 0;
@@ -289,7 +350,7 @@ async function init() {
   ScrollTrigger.create({
     trigger: "#section2",
     start: "top top",
-    end: `+=${window.innerHeight * SCROLL_VH_PER_FRAME * S2_FRAME_COUNT}`,
+    end: `+=${window.innerHeight * SCROLL_VH_PER_FRAME * S2_FRAME_COUNT * S2_SCROLL_MULTIPLIER}`,
     pin: true,
     anticipatePin: 1,
     scrub: 0.4,
@@ -297,12 +358,22 @@ async function init() {
     onEnter: () => updateSection2(0),
   });
 
+  ScrollTrigger.create({
+    trigger: "#section3",
+    start: "top bottom",
+    end: "bottom top",
+    scrub: 0.4,
+    onUpdate: (self) => updateSection3(self.progress),
+  });
+
   window.addEventListener("resize", () => {
     resizeCanvas(s1Canvas, s1Ctx);
     resizeCanvas(s2Canvas, s2Ctx);
     measureTextLayout();
+    measureSection3Layout();
     ScrollTrigger.refresh();
   });
+
 }
 
 init();
