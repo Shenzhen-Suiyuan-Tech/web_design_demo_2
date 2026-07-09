@@ -1,0 +1,30 @@
+{
+  "name": "web_design_demo_2",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Shenzhen-Suiyuan-Tech/web_design_demo_2.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/Shenzhen-Suiyuan-Tech/web_design_demo_2/issues"
+  },
+  "homepage": "https://github.com/Shenzhen-Suiyuan-Tech/web_design_demo_2#readme",
+  "devDependencies": {
+    "typescript": "^7.0.2",
+    "vite": "^8.1.4"
+  },
+  "dependencies": {
+    "gsap": "^3.15.0"
+  }
+}
