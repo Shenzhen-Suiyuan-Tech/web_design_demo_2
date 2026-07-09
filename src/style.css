@@ -1,6 +1,5 @@
 :root {
-  --section2-bg: #f5f5f7;
-  --ink: #1d1d1f;
+  --section2-bg: #000;
 }
 
 * {
@@ -81,7 +80,7 @@ body {
 
 .text-top,
 .text-bottom {
-  position: absolute;
+  position: fixed;
   left: 50%;
   color: #fff;
   will-change: transform;
@@ -95,6 +94,31 @@ body {
 .text-bottom {
   bottom: calc(100vh / 9);
   width: 20vw;
+}
+
+.text-second,
+.text-second-right {
+  position: fixed;
+  top: 0;
+  margin: 0;
+  color: #fff;
+  font-size: 1.7vh;
+  line-height: 1.6;
+  font-weight: 400;
+  opacity: 0;
+  white-space: nowrap;
+  will-change: transform, opacity, top;
+  z-index: 5;
+}
+
+.text-second {
+  left: 12.5vw;
+  text-align: left;
+}
+
+.text-second-right {
+  right: 12.5vw;
+  text-align: left;
 }
 
 .hero-title {
@@ -153,21 +177,36 @@ body {
   .text-bottom {
     width: 65vw;
   }
+
+  .text-second,
+  .text-second-right {
+    max-width: 84vw;
+    font-size: 3.2vw;
+    white-space: normal;
+  }
+
+  .text-second {
+    left: 8vw;
+  }
+
+  .text-second-right {
+    right: 8vw;
+  }
 }
 
-/* ---------- section 2 (placeholder) ---------- */
+/* ---------- section 2 ---------- */
 
 .section2 {
   position: relative;
   height: 100vh;
   background: var(--section2-bg);
-  color: var(--ink);
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  overflow: hidden;
 }
 
-.section2 h2 {
-  font-size: 4vh;
-  font-weight: 600;
+#section2-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  will-change: filter, opacity;
 }
