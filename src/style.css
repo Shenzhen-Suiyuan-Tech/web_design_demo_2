@@ -46,13 +46,15 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  width: 75%;
-  max-width: 960px;
+  width: 80%;
+  max-width: 1040px;
   margin: 0 auto;
   height: 5vh;
 }
 
 .nav-logo {
+  display: inline-flex;
+  align-items: flex-end;
   font-family: "Univers", "Univers Next", "Helvetica Neue", Helvetica, Arial,
     sans-serif;
   font-size: 1.6rem;
@@ -65,6 +67,19 @@ body {
 
 .site-nav--dark .nav-logo {
   color: #fbfcfc;
+}
+
+/* A drawn circle rather than a "." character - some fonts render a period
+   as more of a rounded square at this weight/size. Sized relative to Egg's
+   own font-size and bottom-aligned to it (via the flex above) so it reads
+   as part of the same word "Egg." rather than a separate mark. */
+.nav-logo-dot {
+  width: 0.3em;
+  height: 0.3em;
+  margin-left: 0.06em;
+  border-radius: 50%;
+  background: currentColor;
+  margin-bottom: 5%;
 }
 
 .nav-right {
@@ -227,22 +242,13 @@ body {
   will-change: opacity;
 }
 
-.text-top,
-.text-bottom {
+.text-top {
   position: fixed;
   left: 50%;
+  top: 14vh;
   color: #fff;
   will-change: transform;
   z-index: 5;
-}
-
-.text-top {
-  top: 14vh;
-}
-
-.text-bottom {
-  bottom: calc(100vh / 9);
-  width: 20vw;
 }
 
 .text-second,
@@ -293,16 +299,24 @@ body {
   white-space: nowrap;
 }
 
+/* The three short phrases are individually positioned (transform-driven
+   from JS, see updateSection1/updateSection2) rather than relying on
+   CSS left/bottom, since they spread apart and converge independently. */
 .hero-content {
+  position: fixed;
+  left: 0;
+  top: 0;
   margin: 0;
   width: fit-content;
-  max-width: 20vw;
   text-align: left;
   font-size: 2vh;
   line-height: 1.4;
   font-weight: 400;
-  color: inherit;
+  color: #fff;
   opacity: 0.75;
+  white-space: nowrap;
+  will-change: transform;
+  z-index: 5;
 }
 
 /* ---------- responsive (narrow / mobile viewports) ---------- */
@@ -320,11 +334,6 @@ body {
 
   .hero-content {
     font-size: 3.4vw;
-    max-width: 65vw;
-  }
-
-  .text-bottom {
-    width: 65vw;
   }
 
   .text-second,

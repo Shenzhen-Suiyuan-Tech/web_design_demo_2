@@ -111,7 +111,11 @@ for (const link of navLinks) {
 }
 
 const textTop = document.querySelector(".text-top") as HTMLDivElement;
-const textBottom = document.querySelector(".text-bottom") as HTMLDivElement;
+const heroContentLeft = document.querySelector(".hero-content-left") as HTMLParagraphElement;
+const heroContentCenter = document.querySelector(".hero-content-center") as HTMLParagraphElement;
+const heroContentRight = document.querySelector(".hero-content-right") as HTMLParagraphElement;
+const heroContentEls = [heroContentLeft, heroContentCenter, heroContentRight] as const;
+const navInnerEl = document.querySelector(".site-nav-inner") as HTMLElement;
 const textSecond = document.querySelector(".text-second") as HTMLParagraphElement;
 const textSecondRight = document.querySelector(".text-second-right") as HTMLParagraphElement;
 const textThird = document.querySelector(".text-third") as HTMLParagraphElement;
@@ -164,8 +168,16 @@ function updateSection1(progress: number) {
   const transform = `translate(${xPercent}%, 0)`;
   textTop.style.left = `${left}%`;
   textTop.style.transform = transform;
-  textBottom.style.left = `${left}%`;
-  textBottom.style.transform = transform;
+
+  // The three content lines start spread across the bottom (left/center/
+  // right, all at the same height) and converge on the title's landing x,
+  // fanning out vertically into a stack as they arrive - left line ends up
+  // on top, right line on the bottom.
+  for (let i = 0; i < heroContentEls.length; i++) {
+    const x = lerp(contentSpreadX[i], contentFinalXPx, progress);
+    const y = lerp(contentInitialTopPx, contentInitialTopPx + contentRowOffsetPx[i], progress);
+    heroContentEls[i].style.transform = `translate(${x}px, ${y}px)`;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -203,25 +215,57 @@ let s2Images: HTMLImageElement[] = [];
 // mid-animation transform is currently applied.
 let titleTopPx = 0;
 let consolidatedContentTopPx = 0;
+// Shared row height/baseline for the three hero-content lines (same
+// font/line-height, short single-line phrases, so one measurement covers
+// all three). contentInitialTopPx is that baseline's y - it's also exactly
+// the center line's stacked position and section 2's starting top, so the
+// handoff between section 1 and section 2 has no seam.
+let contentRowHeightPx = 0;
 let contentInitialTopPx = 0;
+let contentRowOffsetPx: [number, number, number] = [0, 0, 0];
+// Per-line x at rest (progress 0, spread across the nav bar's own content
+// width) - all three converge on contentFinalXPx by the time section 1 ends.
+let contentSpreadX: [number, number, number] = [0, 0, 0];
+let contentFinalXPx = 0;
 let vanishTopPx = 0;
+let secondVanishTopPx = 0;
 let secondInitialTopPx = 0;
 let secondRightInitialTopPx = 0;
 
 function measureTextLayout() {
   const titleRect = titleEl.getBoundingClientRect();
   const subtitleRect = subtitleEl.getBoundingClientRect();
-  const contentHeight = textBottom.getBoundingClientRect().height;
   const secondHeight = textSecond.getBoundingClientRect().height;
   const secondRightHeight = textSecondRight.getBoundingClientRect().height;
 
   titleTopPx = titleRect.top;
   const titleSubtitleGapPx = subtitleRect.top - titleRect.bottom;
   consolidatedContentTopPx = subtitleRect.bottom + titleSubtitleGapPx;
-  contentInitialTopPx = window.innerHeight - window.innerHeight / 9 - contentHeight;
+
+  // Row 0 (top, left line) lands exactly at consolidatedContentTopPx once
+  // section 2 consolidates the group under the subtitle - rows 1/2 stack
+  // below it - rather than centering the stack on that point, which would
+  // push the top row up into the subtitle.
+  contentRowHeightPx = heroContentCenter.getBoundingClientRect().height;
+  contentInitialTopPx = window.innerHeight - window.innerHeight / 9 - contentRowHeightPx;
+  contentRowOffsetPx = [0, contentRowHeightPx, contentRowHeightPx * 2];
+
+  // "50%"/"12.5%" for position:fixed elements resolve against the layout
+  // viewport (clientWidth), which excludes the scrollbar - window.innerWidth
+  // includes it, so using that here would drift these off the title/
+  // subtitle's actual centered position by half the scrollbar's width.
+  const viewportWidth = document.documentElement.clientWidth;
+  const navRect = navInnerEl.getBoundingClientRect();
+  const centerWidth = heroContentCenter.getBoundingClientRect().width;
+  const rightWidth = heroContentRight.getBoundingClientRect().width;
+  contentSpreadX = [navRect.left, viewportWidth / 2 - centerWidth / 2, navRect.right - rightWidth];
+  contentFinalXPx = viewportWidth * 0.125;
 
   const risePx = (window.innerHeight * FIRST_BATCH_RISE_VH) / 100;
   vanishTopPx = titleTopPx - risePx;
+  // A bit further down than the first batch's vanish point, purely so this
+  // second line's resting spot doesn't end up crowding the nav bar.
+  secondVanishTopPx = vanishTopPx + window.innerHeight * 0.04;
 
   secondInitialTopPx = (window.innerHeight - secondHeight) / 2;
   secondRightInitialTopPx = (window.innerHeight - secondRightHeight) / 2;
@@ -247,8 +291,6 @@ function updateSection2(progress: number) {
   // Phase 1 (frame 1-20): content text rises to sit just under the subtitle.
   const consolidateT = clamp(progress / P_CONSOLIDATE_END, 0, 1);
   const contentTop = lerp(contentInitialTopPx, consolidatedContentTopPx, consolidateT);
-  textBottom.style.bottom = "auto";
-  textBottom.style.top = `${contentTop}px`;
 
   // Phase 2 (frame 20-50): the whole group rises further and fades out together.
   const groupT = clamp((progress - P_CONSOLIDATE_END) / (P_GROUP_FADE_END - P_CONSOLIDATE_END), 0, 1);
@@ -257,8 +299,15 @@ function updateSection2(progress: number) {
   const groupTransform = `translateY(-${groupRisePx}px)`;
   textTop.style.opacity = `${groupOpacity}`;
   textTop.style.transform = groupTransform;
-  textBottom.style.opacity = `${groupOpacity}`;
-  textBottom.style.transform = groupTransform;
+
+  // The three lines keep their fixed stacked offsets throughout (baked into
+  // contentRowOffsetPx), so the whole group consolidates, rises, and fades
+  // as one rigid block rather than drifting apart.
+  for (let i = 0; i < heroContentEls.length; i++) {
+    const y = contentTop + contentRowOffsetPx[i] - groupRisePx;
+    heroContentEls[i].style.transform = `translate(${contentFinalXPx}px, ${y}px)`;
+    heroContentEls[i].style.opacity = `${groupOpacity}`;
+  }
 
   // Phase 3 (frame 60-70 fade in, 75-90 move up, 90-120 fade out).
   const secondFadeInT = clamp((progress - P_SECOND_FADE_IN_START) / (P_SECOND_FADE_IN_END - P_SECOND_FADE_IN_START), 0, 1);
@@ -276,11 +325,11 @@ function updateSection2(progress: number) {
     secondOpacity = 1 - secondFadeOutT;
   }
 
-  const secondTop = lerp(secondInitialTopPx, vanishTopPx, secondMoveT);
+  const secondTop = lerp(secondInitialTopPx, secondVanishTopPx, secondMoveT);
   textSecond.style.opacity = `${secondOpacity}`;
   textSecond.style.top = `${secondTop}px`;
 
-  const secondRightTop = lerp(secondRightInitialTopPx, vanishTopPx, secondMoveT);
+  const secondRightTop = lerp(secondRightInitialTopPx, secondVanishTopPx, secondMoveT);
   textSecondRight.style.opacity = `${secondOpacity}`;
   textSecondRight.style.top = `${secondRightTop}px`;
 }
