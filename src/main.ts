@@ -198,10 +198,10 @@ const P_CONSOLIDATE_END = frameToProgress(20, S2_FRAME_COUNT);
 const P_GROUP_FADE_END = frameToProgress(50, S2_FRAME_COUNT);
 const P_SECOND_FADE_IN_START = frameToProgress(55, S2_FRAME_COUNT);
 const P_SECOND_FADE_IN_END = frameToProgress(65, S2_FRAME_COUNT);
+// Slower than the first batch's rise - takes twice as many frames to reach
+// its vanish point.
 const P_SECOND_MOVE_START = frameToProgress(70, S2_FRAME_COUNT);
-const P_SECOND_MOVE_END = frameToProgress(80, S2_FRAME_COUNT);
-const P_SECOND_FADE_OUT_START = frameToProgress(120, S2_FRAME_COUNT);
-const P_SECOND_FADE_OUT_END = frameToProgress(150, S2_FRAME_COUNT);
+const P_SECOND_MOVE_END = frameToProgress(90, S2_FRAME_COUNT);
 
 const FIRST_BATCH_RISE_VH = 5;
 
@@ -309,20 +309,20 @@ function updateSection2(progress: number) {
     heroContentEls[i].style.opacity = `${groupOpacity}`;
   }
 
-  // Phase 3 (frame 60-70 fade in, 75-90 move up, 90-120 fade out).
+  // Phase 3: fades in, then rises to its vanish point and holds there at
+  // full opacity for the rest of the section - it doesn't start fading out
+  // until section 3's image is on its way in (see updateSection3), so the
+  // whole handoff takes noticeably longer than before.
   const secondFadeInT = clamp((progress - P_SECOND_FADE_IN_START) / (P_SECOND_FADE_IN_END - P_SECOND_FADE_IN_START), 0, 1);
   const secondMoveT = clamp((progress - P_SECOND_MOVE_START) / (P_SECOND_MOVE_END - P_SECOND_MOVE_START), 0, 1);
-  const secondFadeOutT = clamp((progress - P_SECOND_FADE_OUT_START) / (P_SECOND_FADE_OUT_END - P_SECOND_FADE_OUT_START), 0, 1);
 
   let secondOpacity = 0;
   if (progress < P_SECOND_FADE_IN_START) {
     secondOpacity = 0;
   } else if (progress < P_SECOND_FADE_IN_END) {
     secondOpacity = secondFadeInT;
-  } else if (progress < P_SECOND_MOVE_END) {
-    secondOpacity = 1;
   } else {
-    secondOpacity = 1 - secondFadeOutT;
+    secondOpacity = 1;
   }
 
   const secondTop = lerp(secondInitialTopPx, secondVanishTopPx, secondMoveT);
@@ -338,16 +338,38 @@ function updateSection2(progress: number) {
 // Section 3: white-eggs still image, scroll-scrubbed width + parallax text
 // ---------------------------------------------------------------------------
 
-// The wrap is a normal (unpinned) 100vh block, so its own entrance and exit
-// come for free from ordinary document flow: scrolling it from fully below
-// the viewport to top-at-top takes exactly one viewport height, and from
-// top-at-top to fully above takes another. A single ScrollTrigger spanning
-// "top bottom" -> "bottom top" therefore gives one continuous 0-1 progress
-// where 0.5 lands exactly on "top reaches the top of the screen".
+// Pinned (unlike before) so the image can briefly hold fully in place once
+// it's finished arriving: it slides in over one viewport height of scroll,
+// holds for a short stretch - roughly two scroll-wheel notches - then slides
+// back out over another viewport height. The hold is spliced into a
+// separate progress value (imageSlideProgress) used only for the image's
+// own on-screen position; the zoom (width) and text below keep tracking raw
+// scroll the whole time, so neither one stalls alongside it.
+const S3_SLIDE_VH = 100;
+const S3_HOLD_VH = 24;
+const S3_TOTAL_VH = S3_SLIDE_VH * 2 + S3_HOLD_VH;
+const S3_SLIDE_IN_END = S3_SLIDE_VH / S3_TOTAL_VH;
+const S3_HOLD_END = (S3_SLIDE_VH + S3_HOLD_VH) / S3_TOTAL_VH;
+
+function imageSlideProgress(raw: number) {
+  if (raw <= S3_SLIDE_IN_END) return (raw / S3_SLIDE_IN_END) * 0.5;
+  if (raw <= S3_HOLD_END) return 0.5;
+  return 0.5 + ((raw - S3_HOLD_END) / (1 - S3_HOLD_END)) * 0.5;
+}
+
+// "top reached" in the same idealized (hold-free) sense the text tracking
+// below already used before the hold was introduced - kept as-is so that
+// tracking stays exactly as it was, unaffected by the image's own pause.
 const S3_TOP_REACHED = 0.5;
 
 const S3_TEXT_FADE_IN_START = S3_TOP_REACHED * 0.5; // image 50% slid in
 const S3_TEXT_FADE_IN_END = S3_TOP_REACHED * 0.75; // image 75% slid in
+
+// Where, in raw progress, the (real, hold-aware) image is exactly half slid
+// in - text-second/-right's long hold from section 2 finishes fading out to
+// 0 by this point (see updateSection2), so it's fully gone by the time the
+// image reaches that mark.
+const S3_SECOND_TEXT_GONE_BY = S3_SLIDE_IN_END * 0.5;
 
 const s3ImageWrap = document.getElementById("section3-image-wrap") as HTMLDivElement;
 
@@ -359,6 +381,8 @@ function measureSection3Layout() {
 
 function updateSection3(progress: number) {
   // Uniform scale for the whole pass through the section: 150% -> 100%.
+  // Driven by raw scroll progress throughout, so it never stalls alongside
+  // the image's hold below.
   s3ImageWrap.style.width = `${lerp(150, 100, progress)}vw`;
 
   const fadeT = clamp(
@@ -368,14 +392,22 @@ function updateSection3(progress: number) {
   );
   textThird.style.opacity = `${fadeT}`;
 
-  // The image is a normal 100vh block scrolling through the viewport, so its
-  // on-screen top/bottom edges are simple functions of progress (top runs
-  // from one viewport height below to one above; bottom is always exactly
-  // a viewport height further down). Clamping each to the viewport bounds
-  // gives the currently-visible slice, and the text tracks its midpoint -
-  // i.e. it's always centered on whatever portion of the image has revealed
-  // so far, sliding from the bottom edge up through screen-center (right as
-  // the image finishes settling into place) and on toward the top edge.
+  // Section 2's second text batch finishes disappearing here, also on raw
+  // progress - unaffected by the image's hold, same as everything else in
+  // this function apart from the image's own top below.
+  const secondTextT = clamp(progress / S3_SECOND_TEXT_GONE_BY, 0, 1);
+  const secondTextOpacity = 1 - secondTextT;
+  textSecond.style.opacity = `${secondTextOpacity}`;
+  textSecondRight.style.opacity = `${secondTextOpacity}`;
+
+  // Idealized (hold-free) on-screen top/bottom edges, exactly as before the
+  // hold was introduced: top runs from one viewport height below to one
+  // above; bottom is always exactly a viewport height further down.
+  // Clamping each to the viewport bounds gives the currently-visible slice,
+  // and the text tracks its midpoint - i.e. it's always centered on
+  // whatever portion of the image has (idealized-ly) revealed so far,
+  // sliding from the bottom edge up through screen-center and on toward the
+  // top edge, on its own schedule regardless of the image's real pause.
   const h = window.innerHeight;
   const imageTop = h * (1 - 2 * progress);
   const imageBottom = imageTop + h;
@@ -396,6 +428,12 @@ function updateSection3(progress: number) {
     top = lerp(h / 2, -s3TextHeightPx - 20, exitT);
   }
   textThird.style.top = `${top}px`;
+
+  // The image's real on-screen position - unlike everything above, this one
+  // does pause: it holds fully in view for a stretch once it arrives, via
+  // the separately-paced imageSlideProgress so the pause only shows up here.
+  const slideProgress = imageSlideProgress(progress);
+  s3ImageWrap.style.top = `${h * (1 - 2 * slideProgress)}px`;
 }
 
 // ---------------------------------------------------------------------------
@@ -723,10 +761,27 @@ async function init() {
 
   ScrollTrigger.create({
     trigger: "#section3",
-    start: "top bottom",
-    end: "bottom top",
+    start: "top top",
+    end: `+=${window.innerHeight * (S3_TOTAL_VH / 100)}`,
+    pin: true,
+    anticipatePin: 1,
     scrub: 0.4,
-    onUpdate: (self) => updateSection3(self.progress),
+    onUpdate: (self) => {
+      updateSection3(self.progress);
+      // Dark over the tail end of section 2's black backdrop while the
+      // image is still arriving; light once it's fully in view.
+      setNavDark(self.progress < S3_SLIDE_IN_END);
+    },
+    onLeave: () => updateSection3(1),
+    onEnter: () => {
+      setActiveNavLink("#section3");
+      setNavDark(true);
+    },
+    onEnterBack: () => {
+      updateSection3(1);
+      setActiveNavLink("#section3");
+      setNavDark(false);
+    },
   });
 
   ScrollTrigger.create({
@@ -747,11 +802,11 @@ async function init() {
     onEnterBack: () => setActiveNavLink("#section4"),
   });
 
-  // Sections 3 and 4 are never pinned, so their natural "bottom" always
-  // matches their real visual extent - a plain marker trigger works fine
-  // for them (unlike the pinned sections above).
+  // Section 4 is never pinned, so its natural "bottom" always matches its
+  // real visual extent - a plain marker trigger works fine for it (unlike
+  // the pinned sections, including section 3 above, which hook nav state
+  // into their own pin trigger's onEnter/onEnterBack instead).
   const navMarkers: { trigger: string; hash: string; dark: boolean }[] = [
-    { trigger: "#section3", hash: "#section3", dark: false },
     { trigger: "#section4", hash: "#section4", dark: false },
   ];
   for (const marker of navMarkers) {
