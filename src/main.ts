@@ -78,6 +78,38 @@ function drawFrame(ctx: CanvasRenderingContext2D, img: HTMLImageElement | undefi
 const loader = document.getElementById("loader") as HTMLDivElement;
 const loaderFill = document.getElementById("loader-fill") as HTMLDivElement;
 
+// ---------------------------------------------------------------------------
+// Nav bar: dark/light theme follows whatever's currently behind it, and the
+// active link follows scroll position (or an immediate click) with a
+// crossfading underline.
+// ---------------------------------------------------------------------------
+
+const navEl = document.querySelector(".site-nav") as HTMLElement;
+const navLinks = [...document.querySelectorAll<HTMLAnchorElement>(".nav-link")];
+
+let navIsDark = false;
+function setNavDark(isDark: boolean) {
+  if (isDark === navIsDark) return;
+  navIsDark = isDark;
+  navEl.classList.toggle("site-nav--dark", isDark);
+}
+
+let activeNavHash = "";
+function setActiveNavLink(hash: string) {
+  if (hash === activeNavHash) return;
+  activeNavHash = hash;
+  for (const link of navLinks) {
+    link.classList.toggle("is-active", link.getAttribute("href") === hash);
+  }
+}
+
+for (const link of navLinks) {
+  link.addEventListener("click", () => {
+    const hash = link.getAttribute("href");
+    if (hash) setActiveNavLink(hash);
+  });
+}
+
 const textTop = document.querySelector(".text-top") as HTMLDivElement;
 const textBottom = document.querySelector(".text-bottom") as HTMLDivElement;
 const textSecond = document.querySelector(".text-second") as HTMLParagraphElement;
@@ -328,15 +360,58 @@ function updateSection3(progress: number) {
 
 const S5_FRAME_COUNT = 300;
 const S5_FRAME_START = 262; // source files are frame_0262.jpg .. frame_0561.jpg
-const S5_REVEAL_END = frameToProgress(15, S5_FRAME_COUNT);
+const S5_REVEAL_END = frameToProgress(6, S5_FRAME_COUNT);
 
 const S5_TEXT_FADE_IN_START = frameToProgress(90, S5_FRAME_COUNT);
 const S5_TEXT_FADE_IN_END = frameToProgress(130, S5_FRAME_COUNT);
 const S5_TEXT_FALL_END = frameToProgress(220, S5_FRAME_COUNT);
 
+const s5El = document.getElementById("section5") as HTMLElement;
 const s5Canvas = document.getElementById("section5-canvas") as HTMLCanvasElement;
 const s5Ctx = s5Canvas.getContext("2d")!;
 let s5Images: HTMLImageElement[] = [];
+
+// How far the canvas has already faded in during section 5's pre-pin slide
+// (see updateSection5PreEntry, driven by a plain scroll listener rather than
+// another ScrollTrigger on this same pinned element - adding a second one
+// was found to corrupt its pin-spacer sizing) - the post-pin reveal below
+// continues from this instead of restarting at 0, so there's no opacity
+// snap right as the pin engages.
+let s5PreRevealOpacity = 0;
+
+// Whether section 5's own pin trigger currently considers itself active,
+// based on the raw scroll position (set from onEnter/onEnterBack/onLeave/
+// onLeaveBack in init()). Needed because with scrub easing, onUpdate can
+// keep firing with a lagging, not-yet-settled progress value for a moment
+// after the raw scroll position has already exited the pin range - without
+// this guard, that lagging update can re-assert the dark theme right after
+// section 4's marker correctly already switched it back to light.
+// Section 5 slides up from below like any normal block before its own pin
+// engages. During that slide the canvas would otherwise sit at opacity 0 (a
+// plain black box) for a full viewport height of scrolling, reading as a
+// long dead-black stretch, and the nav would only flip dark once section 5
+// covers the *entire* viewport rather than just the nav's own strip at the
+// top. Both are corrected here, driven directly off section 5's live
+// position on every scroll tick; once truly pinned (rect.top <= 0) this
+// hands off entirely to updateSection5/updateSection6.
+let s5PrevTop = Infinity;
+function updateSection5PreEntry() {
+  const rect = s5El.getBoundingClientRect();
+  const h = window.innerHeight;
+  // Only while actually approaching (top decreasing) - otherwise, right
+  // after leaving the pin backward, top starts at ~0 and briefly satisfies
+  // the "close enough" check below while really just retreating, which
+  // would wrongly re-flip the nav dark the instant section 4 correctly set
+  // it back to light.
+  const approaching = rect.top < s5PrevTop;
+  if (rect.top > 0) {
+    const slideT = clamp(1 - rect.top / h, 0, 1);
+    s5PreRevealOpacity = slideT * 0.6;
+    s5Canvas.style.opacity = `${s5PreRevealOpacity}`;
+    if (approaching && rect.top <= h * 0.05) setNavDark(true);
+  }
+  s5PrevTop = rect.top;
+}
 
 let s5TextTopStartPx = 0;
 let s5TextTopEndPx = 0;
@@ -360,9 +435,10 @@ function updateSection5(progress: number) {
   drawFrame(s5Ctx, s5Images[frameIndex]);
 
   // Unlike section 3, the frame appears fully in place from the start (no
-  // slide-in) - it just fades up from black over the first 15 frames.
+  // slide-in) - it just fades the rest of the way up over the first few
+  // frames, continuing from wherever the pre-pin slide left it off.
   const revealT = clamp(progress / S5_REVEAL_END, 0, 1);
-  s5Canvas.style.opacity = `${revealT}`;
+  s5Canvas.style.opacity = `${lerp(s5PreRevealOpacity, 1, revealT)}`;
 
   const fadeT = clamp(
     (progress - S5_TEXT_FADE_IN_START) / (S5_TEXT_FADE_IN_END - S5_TEXT_FADE_IN_START),
@@ -423,7 +499,7 @@ function measureSection6Layout() {
   s6EggBottomPx = window.innerHeight - s6TitleTopPx + eggGapPx;
 }
 
-function updateSection6(progress: number) {
+function updateSection6(progress: number, isActive: boolean) {
   // Curtain rises from fully below the viewport to fully covering it.
   const curtainT = clamp(progress / S6_CURTAIN_END, 0, 1);
   const curtainTranslateYPercent = lerp(100, 0, curtainT);
@@ -460,6 +536,19 @@ function updateSection6(progress: number) {
   s6TitleRight.style.opacity = `${eggT}`;
   s6TitleLeft.style.top = `${s6TitleTopPx}px`;
   s6TitleRight.style.top = `${s6TitleTopPx}px`;
+
+  // The nav sits over black crack-egg canvas until the curtain's rising edge
+  // passes behind it, at which point it's over the light curtain instead.
+  // Guarded by isActive (GSAP's own ground truth for the raw scroll
+  // position) because with scrub easing, onUpdate can keep firing with a
+  // lagging, not-yet-settled progress value for a moment after the raw
+  // scroll position has already exited the pin range - without this guard,
+  // that lagging update can re-assert the dark theme right after section
+  // 4's marker correctly already switched it back to light.
+  if (isActive) {
+    const navHeightPx = window.innerHeight * 0.05;
+    setNavDark(curtainTopPx > navHeightPx);
+  }
 }
 
 // Section 5 and 6 share one pin: the crack-egg sequence gets the same scroll
@@ -469,14 +558,17 @@ const S5_PHASE_SCROLL_VH = SCROLL_VH_PER_FRAME * S5_FRAME_COUNT;
 const S6_PHASE_SCROLL_VH = 2;
 const S5_PHASE_END = S5_PHASE_SCROLL_VH / (S5_PHASE_SCROLL_VH + S6_PHASE_SCROLL_VH);
 
-function updateSection5And6(progress: number) {
+function updateSection5And6(progress: number, isActive = true) {
   updateSection5(clamp(progress / S5_PHASE_END, 0, 1));
-  updateSection6(clamp((progress - S5_PHASE_END) / (1 - S5_PHASE_END), 0, 1));
+  updateSection6(clamp((progress - S5_PHASE_END) / (1 - S5_PHASE_END), 0, 1), isActive);
 }
 
 // ---------------------------------------------------------------------------
 
 async function init() {
+  setActiveNavLink("#section1");
+  setNavDark(true);
+
   resizeCanvas(s1Canvas, s1Ctx);
   resizeCanvas(s2Canvas, s2Ctx);
   resizeCanvas(s5Canvas, s5Ctx);
@@ -525,6 +617,8 @@ async function init() {
   measureSection5Layout();
   measureSection6Layout();
   updateSection5And6(0);
+  updateSection5PreEntry();
+  window.addEventListener("scroll", updateSection5PreEntry, { passive: true });
   loader.classList.add("is-hidden");
 
   ScrollTrigger.create({
@@ -541,7 +635,15 @@ async function init() {
     // one-frame seam where section 1 hasn't fully faded to black yet.
     // Forcing the end state here closes that gap.
     onLeave: () => updateSection1(1),
-    onEnterBack: () => updateSection1(1),
+    onEnter: () => {
+      setActiveNavLink("#section1");
+      setNavDark(true);
+    },
+    onEnterBack: () => {
+      updateSection1(1);
+      setActiveNavLink("#section1");
+      setNavDark(true);
+    },
   });
 
   ScrollTrigger.create({
@@ -552,7 +654,22 @@ async function init() {
     anticipatePin: 1,
     scrub: 0.4,
     onUpdate: (self) => updateSection2(self.progress),
-    onEnter: () => updateSection2(0),
+    onEnter: () => {
+      updateSection2(0);
+      setActiveNavLink("#section2");
+      setNavDark(true);
+    },
+    // Sections 1 and 2 are pinned, so a plain "bottom top" marker trigger on
+    // them would only span their own unpinned natural height, not the full
+    // pin duration - it'd fall out of range long before the pin actually
+    // ends, and the nav's dark state would silently stop being reasserted
+    // for the rest of the section. Hooking directly into each pin trigger's
+    // own onEnter/onEnterBack instead guarantees the nav state is set over
+    // that trigger's real, full-length active range.
+    onEnterBack: () => {
+      setActiveNavLink("#section2");
+      setNavDark(true);
+    },
   });
 
   ScrollTrigger.create({
@@ -570,9 +687,37 @@ async function init() {
     pin: true,
     anticipatePin: 1,
     scrub: 0.4,
-    onUpdate: (self) => updateSection5And6(self.progress),
-    onEnter: () => updateSection5And6(0),
+    onUpdate: (self) => updateSection5And6(self.progress, self.isActive),
+    onEnter: () => {
+      updateSection5And6(0);
+      // There's no 5th/6th nav link, so this just keeps "About" active;
+      // dark/light is instead driven every tick by updateSection6, based on
+      // the curtain's position relative to the nav.
+      setActiveNavLink("#section4");
+    },
+    onEnterBack: () => setActiveNavLink("#section4"),
   });
+
+  // Sections 3 and 4 are never pinned, so their natural "bottom" always
+  // matches their real visual extent - a plain marker trigger works fine
+  // for them (unlike the pinned sections above).
+  const navMarkers: { trigger: string; hash: string; dark: boolean }[] = [
+    { trigger: "#section3", hash: "#section3", dark: false },
+    { trigger: "#section4", hash: "#section4", dark: false },
+  ];
+  for (const marker of navMarkers) {
+    const onCross = () => {
+      setActiveNavLink(marker.hash);
+      setNavDark(marker.dark);
+    };
+    ScrollTrigger.create({
+      trigger: marker.trigger,
+      start: "top top",
+      end: "bottom top",
+      onEnter: onCross,
+      onEnterBack: onCross,
+    });
+  }
 
   window.addEventListener("resize", () => {
     resizeCanvas(s1Canvas, s1Ctx);
