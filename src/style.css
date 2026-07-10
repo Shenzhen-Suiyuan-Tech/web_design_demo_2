@@ -371,32 +371,23 @@ body {
 
 /* ---------- section 3 ---------- */
 
-/* Background is driven from JS (see updateSection3) - now that the section
-   is pinned (see below), this is what's exposed behind the image whenever
-   it's not fully covering the viewport (arriving or leaving), so it has to
-   switch between section 2's black and section 4's light tone rather than
-   staying one flat color. #000 here is just the initial/fallback value. */
 .section3 {
   position: relative;
   height: 100vh;
-  overflow: hidden;
-  background: #000;
+  background: #fff;
 }
 
-/* Pinned so the image can briefly hold fully in place mid-section (see
-   updateSection3) - position is therefore scroll-driven (top, in JS) rather
-   than coming from normal document flow. Only width and top change; height
-   always matches the viewport exactly, and the image crops (object-fit)
-   rather than stretches. */
+/* Normal document flow (no pin) - it slides into and out of view like any
+   other block. Only its width is scroll-driven; height always matches the
+   viewport exactly, and the image crops (object-fit) rather than stretches. */
 #section3-image-wrap {
-  position: fixed;
+  position: relative;
   left: 50%;
-  top: 0;
   width: 130vw;
   height: 100vh;
   transform: translateX(-50%);
   overflow: hidden;
-  will-change: width, top;
+  will-change: width;
 }
 
 #section3-image {
