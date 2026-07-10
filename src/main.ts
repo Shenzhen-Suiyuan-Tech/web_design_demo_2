@@ -26,13 +26,18 @@ function frameToProgress(frame: number, frameCount: number) {
   return (frame - 1) / (frameCount - 1);
 }
 
-function preloadImages(basePath: string, count: number, onProgress: (loaded: number) => void): Promise<HTMLImageElement[]> {
+function preloadImages(
+  basePath: string,
+  count: number,
+  onProgress: (loaded: number) => void,
+  startFrame = 1,
+): Promise<HTMLImageElement[]> {
   const images: HTMLImageElement[] = [];
   return new Promise((resolve) => {
     let loaded = 0;
-    for (let i = 1; i <= count; i++) {
+    for (let i = 0; i < count; i++) {
       const img = new Image();
-      img.src = `${basePath}/frame_${String(i).padStart(4, "0")}.jpg`;
+      img.src = `${basePath}/frame_${String(startFrame + i).padStart(4, "0")}.jpg`;
       const onDone = () => {
         loaded++;
         onProgress(loaded);
@@ -78,6 +83,7 @@ const textBottom = document.querySelector(".text-bottom") as HTMLDivElement;
 const textSecond = document.querySelector(".text-second") as HTMLParagraphElement;
 const textSecondRight = document.querySelector(".text-second-right") as HTMLParagraphElement;
 const textThird = document.querySelector(".text-third") as HTMLParagraphElement;
+const textFourth = document.querySelector(".text-fourth") as HTMLParagraphElement;
 const titleEl = textTop.querySelector(".hero-title") as HTMLElement;
 const subtitleEl = textTop.querySelector(".hero-subtitle") as HTMLElement;
 
@@ -255,32 +261,21 @@ function updateSection2(progress: number) {
 // "top bottom" -> "bottom top" therefore gives one continuous 0-1 progress
 // where 0.5 lands exactly on "top reaches the top of the screen".
 const S3_TOP_REACHED = 0.5;
-// "90% exited": 90% of a further one-viewport-height exit, i.e. 0.5 + 0.9 * 0.5.
-const S3_MOSTLY_EXITED = S3_TOP_REACHED + 0.9 * (1 - S3_TOP_REACHED);
 
 const S3_TEXT_FADE_IN_START = S3_TOP_REACHED * 0.5; // image 50% slid in
 const S3_TEXT_FADE_IN_END = S3_TOP_REACHED * 0.75; // image 75% slid in
 
 const s3ImageWrap = document.getElementById("section3-image-wrap") as HTMLDivElement;
 
-let s3TextInitialTopPx = 0;
-let s3TextTargetTopPx = 0;
+let s3TextHeightPx = 0;
 
 function measureSection3Layout() {
-  const textHeight = textThird.getBoundingClientRect().height;
-  s3TextInitialTopPx = window.innerHeight - window.innerHeight / 4 - textHeight;
-  s3TextTargetTopPx = (window.innerHeight * 2) / 5;
+  s3TextHeightPx = textThird.getBoundingClientRect().height;
 }
 
 function updateSection3(progress: number) {
-  let widthVw: number;
-  if (progress <= S3_TOP_REACHED) {
-    widthVw = lerp(130, 120, progress / S3_TOP_REACHED);
-  } else {
-    const t = clamp((progress - S3_TOP_REACHED) / (S3_MOSTLY_EXITED - S3_TOP_REACHED), 0, 1);
-    widthVw = lerp(120, 100, t);
-  }
-  s3ImageWrap.style.width = `${widthVw}vw`;
+  // Uniform scale for the whole pass through the section: 150% -> 100%.
+  s3ImageWrap.style.width = `${lerp(150, 100, progress)}vw`;
 
   const fadeT = clamp(
     (progress - S3_TEXT_FADE_IN_START) / (S3_TEXT_FADE_IN_END - S3_TEXT_FADE_IN_START),
@@ -289,10 +284,85 @@ function updateSection3(progress: number) {
   );
   textThird.style.opacity = `${fadeT}`;
 
-  // Constant speed throughout: the same per-progress rate established while
-  // sliding up to the target continues unchanged as it slides back out.
-  const top = lerp(s3TextInitialTopPx, s3TextTargetTopPx, progress / S3_TOP_REACHED);
+  // The image is a normal 100vh block scrolling through the viewport, so its
+  // on-screen top/bottom edges are simple functions of progress (top runs
+  // from one viewport height below to one above; bottom is always exactly
+  // a viewport height further down). Clamping each to the viewport bounds
+  // gives the currently-visible slice, and the text tracks its midpoint -
+  // i.e. it's always centered on whatever portion of the image has revealed
+  // so far, sliding from the bottom edge up through screen-center (right as
+  // the image finishes settling into place) and on toward the top edge.
+  const h = window.innerHeight;
+  const imageTop = h * (1 - 2 * progress);
+  const imageBottom = imageTop + h;
+  const visibleTop = clamp(imageTop, 0, h);
+  const visibleBottom = clamp(imageBottom, 0, h);
+  const revealCenter = (visibleTop + visibleBottom) / 2;
+
+  let top: number;
+  if (progress <= S3_TOP_REACHED) {
+    top = revealCenter;
+  } else {
+    // Past that point the image is on its way back out, and the reveal
+    // center alone would never carry the text past the top edge (it's
+    // mathematically bounded to stay on screen). Continue in a straight
+    // line at a constant rate instead, past the top and fully out of view
+    // by the time the section finishes scrolling by.
+    const exitT = (progress - S3_TOP_REACHED) / (1 - S3_TOP_REACHED);
+    top = lerp(h / 2, -s3TextHeightPx - 20, exitT);
+  }
   textThird.style.top = `${top}px`;
+}
+
+// ---------------------------------------------------------------------------
+// Section 4: crack-egg sequence (pinned, appears whole, no entrance slide)
+// ---------------------------------------------------------------------------
+
+const S4_FRAME_COUNT = 300;
+const S4_FRAME_START = 262; // source files are frame_0262.jpg .. frame_0561.jpg
+const S4_REVEAL_END = frameToProgress(15, S4_FRAME_COUNT);
+
+const S4_TEXT_FADE_IN_START = frameToProgress(90, S4_FRAME_COUNT);
+const S4_TEXT_FADE_IN_END = frameToProgress(130, S4_FRAME_COUNT);
+const S4_TEXT_FALL_END = frameToProgress(220, S4_FRAME_COUNT);
+
+const s4Canvas = document.getElementById("section4-canvas") as HTMLCanvasElement;
+const s4Ctx = s4Canvas.getContext("2d")!;
+let s4Images: HTMLImageElement[] = [];
+
+let s4TextTopStartPx = 0;
+let s4TextTopEndPx = 0;
+
+function measureSection4Layout() {
+  s4TextTopStartPx = window.innerHeight / 3;
+  s4TextTopEndPx = (window.innerHeight * 2) / 3;
+}
+
+function updateSection4(progress: number) {
+  const frameIndex = clamp(Math.round(progress * (S4_FRAME_COUNT - 1)), 0, S4_FRAME_COUNT - 1);
+  drawFrame(s4Ctx, s4Images[frameIndex]);
+
+  // Unlike section 3, the frame appears fully in place from the start (no
+  // slide-in) - it just fades up from black over the first 15 frames.
+  const revealT = clamp(progress / S4_REVEAL_END, 0, 1);
+  s4Canvas.style.opacity = `${revealT}`;
+
+  const fadeT = clamp(
+    (progress - S4_TEXT_FADE_IN_START) / (S4_TEXT_FADE_IN_END - S4_TEXT_FADE_IN_START),
+    0,
+    1,
+  );
+  textFourth.style.opacity = `${fadeT}`;
+
+  // Holds at the top-third mark while fading in, then falls to the
+  // bottom-third mark between the fade-in completing and frame 220.
+  const fallT = clamp(
+    (progress - S4_TEXT_FADE_IN_END) / (S4_TEXT_FALL_END - S4_TEXT_FADE_IN_END),
+    0,
+    1,
+  );
+  const top = lerp(s4TextTopStartPx, s4TextTopEndPx, fallT);
+  textFourth.style.top = `${top}px`;
 }
 
 // ---------------------------------------------------------------------------
@@ -300,19 +370,23 @@ function updateSection3(progress: number) {
 async function init() {
   resizeCanvas(s1Canvas, s1Ctx);
   resizeCanvas(s2Canvas, s2Ctx);
+  resizeCanvas(s4Canvas, s4Ctx);
   measureTextLayout();
   measureSection3Layout();
+  measureSection4Layout();
   updateSection1(0);
   updateSection3(0);
+  updateSection4(0);
 
   let s1Loaded = 0;
   let s2Loaded = 0;
-  const totalFrames = S1_FRAME_COUNT + S2_FRAME_COUNT;
+  let s4Loaded = 0;
+  const totalFrames = S1_FRAME_COUNT + S2_FRAME_COUNT + S4_FRAME_COUNT;
   const updateLoader = () => {
-    loaderFill.style.width = `${((s1Loaded + s2Loaded) / totalFrames) * 100}%`;
+    loaderFill.style.width = `${((s1Loaded + s2Loaded + s4Loaded) / totalFrames) * 100}%`;
   };
 
-  const [s1Result, s2Result] = await Promise.all([
+  const [s1Result, s2Result, s4Result] = await Promise.all([
     preloadImages("/egg", S1_FRAME_COUNT, (loaded) => {
       s1Loaded = loaded;
       updateLoader();
@@ -321,13 +395,24 @@ async function init() {
       s2Loaded = loaded;
       updateLoader();
     }),
+    preloadImages(
+      "/crack_egg",
+      S4_FRAME_COUNT,
+      (loaded) => {
+        s4Loaded = loaded;
+        updateLoader();
+      },
+      S4_FRAME_START,
+    ),
   ]);
   s1Images = s1Result;
   s2Images = s2Result;
+  s4Images = s4Result;
 
   updateSection1(0);
   measureTextLayout();
   updateSection2(0);
+  updateSection4(0);
   loader.classList.add("is-hidden");
 
   ScrollTrigger.create({
@@ -366,11 +451,24 @@ async function init() {
     onUpdate: (self) => updateSection3(self.progress),
   });
 
+  ScrollTrigger.create({
+    trigger: "#section4",
+    start: "top top",
+    end: `+=${window.innerHeight * SCROLL_VH_PER_FRAME * S4_FRAME_COUNT}`,
+    pin: true,
+    anticipatePin: 1,
+    scrub: 0.4,
+    onUpdate: (self) => updateSection4(self.progress),
+    onEnter: () => updateSection4(0),
+  });
+
   window.addEventListener("resize", () => {
     resizeCanvas(s1Canvas, s1Ctx);
     resizeCanvas(s2Canvas, s2Ctx);
+    resizeCanvas(s4Canvas, s4Ctx);
     measureTextLayout();
     measureSection3Layout();
+    measureSection4Layout();
     ScrollTrigger.refresh();
   });
 
