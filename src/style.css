@@ -1,5 +1,7 @@
 :root {
   --section2-bg: #000;
+  --s6-egg-left-x: 36%;
+  --s6-egg-right-x: 64%;
 }
 
 * {
@@ -14,6 +16,121 @@ body {
   background: #000;
   font-family: "Univers", "Univers Next", "Helvetica Neue", Helvetica, Arial,
     sans-serif;
+}
+
+/* ---------- site nav ---------- */
+
+.site-nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 2000;
+  background:
+    rgba(251, 252, 252, 0.897);
+  backdrop-filter: blur(18px) saturate(160%);
+  -webkit-backdrop-filter: blur(18px) saturate(160%);
+  border-bottom: 1.5px solid #e5e5e5;
+}
+
+.site-nav-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 83.3333%;
+  max-width: 1166px;
+  margin: 0 auto;
+  height: 5vh;
+}
+
+.nav-logo {
+  font-family: "Univers", "Univers Next", "Helvetica Neue", Helvetica, Arial,
+    sans-serif;
+  font-size: 1.6rem;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  color: #000;
+  text-decoration: none;
+}
+
+.nav-right {
+  display: flex;
+  align-items: center;
+  height: 100%;
+  gap: 3.2vw;
+}
+
+.nav-links {
+  display: flex;
+  align-items: center;
+  gap: 3.2vw;
+  height: 100%;
+}
+
+.nav-link {
+  position: relative;
+  display: flex;
+  align-items: center;
+  height: 100%;
+  font-family: "Univers", "Univers Next", "Helvetica Neue", Helvetica, Arial,
+    sans-serif;
+  font-size: 0.8rem;
+  font-weight: 520;
+  color: #000;
+  text-decoration: none;
+  white-space: nowrap;
+  /* text-shadow: 0 0 0.01px currentColor; */
+}
+
+.nav-link::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -1px;
+  width: 180%;
+  height: 2px;
+  transform: translateX(-50%);
+  background: transparent;
+}
+
+.nav-link.is-active::after {
+  background: #fbfcfc;
+}
+
+.nav-cta {
+  font-family: "Univers", "Univers Next", "Helvetica Neue", Helvetica, Arial,
+    sans-serif;
+  font-size: 0.8rem;
+  font-weight: 400;
+  color: #fff;
+  background: #c71a4b;
+  border: none;
+  border-radius: 999px;
+  padding: 0.6em 1.4em;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+@media (max-width: 768px), (max-aspect-ratio: 3/4) {
+  .site-nav-inner {
+    width: 100%;
+    max-width: none;
+    height: 60px;
+    padding: 0 5vw;
+  }
+
+  .nav-logo {
+    font-size: 1.3rem;
+  }
+
+  .nav-links {
+    display: none;
+  }
+
+  .nav-cta {
+    font-size: 0.85rem;
+    padding: 0.55em 1.2em;
+  }
 }
 
 /* ---------- loader ---------- */
@@ -263,16 +380,93 @@ body {
   }
 }
 
-/* ---------- section 4 ---------- */
+/* ---------- section 4 (static: light-flow image + copy, no scroll rig) ---------- */
 
 .section4 {
+  --section4-content-width: 50vw;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4vh;
+  min-height: 100vh;
+  padding: 10vh 0;
+  background: rgb(244, 248, 250);
+}
+
+.section4-title {
+  margin: 0;
+  width: fit-content;
+  text-align: center;
+  font-size: 9vh;
+  line-height: 1;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+  background: linear-gradient(to bottom, #e08a3e, #cfeef0);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  padding-bottom: 8vh;
+  padding-top: 6vh;
+}
+
+.section4-image {
+  display: block;
+  width: var(--section4-content-width);
+  height: auto;
+  border-radius: 1.2vw;
+}
+
+.section4-columns {
+  display: flex;
+  width: var(--section4-content-width);
+}
+
+.section4-column {
+  margin: 0;
+  width: 100%;
+  font-size: 1.25rem;
+  line-height: 1.6;
+  font-weight: 500;
+  color: #000;
+  text-align: left;
+  white-space: normal;
+  padding-top: 2vh;
+  padding-bottom: 3vh;
+}
+
+@media (max-width: 768px), (max-aspect-ratio: 3/4) {
+  .section4-title {
+    font-size: 13vw;
+  }
+
+  .section4-image {
+    width: 85vw;
+    border-radius: 3vw;
+  }
+
+  .section4-columns {
+    width: 85vw;
+  }
+
+  .section4-column {
+    font-size: 3.2vw;
+    white-space: normal;
+  }
+}
+
+/* ---------- section 5 (crack-egg sequence, pinned, appears whole) ---------- */
+
+.section5 {
   position: relative;
   height: 100vh;
   background: #000;
   overflow: hidden;
 }
 
-#section4-canvas {
+#section5-canvas {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -280,26 +474,122 @@ body {
   will-change: opacity;
 }
 
-.text-fourth {
+.text-fifth-left,
+.text-fifth-right,
+.text-fifth-left-black,
+.text-fifth-right-black {
   position: fixed;
-  left: 50%;
   top: 0;
   margin: 0;
-  width: fit-content;
-  color: #fff;
-  font-size: 9vh;
-  line-height: 1;
-  font-weight: 600;
-  letter-spacing: -0.02em;
-  white-space: nowrap;
+  width: 11.111vw;
+  font-size: 1.6vh;
+  line-height: 1.7;
+  font-weight: 500;
+  white-space: normal;
+  text-align: left;
   opacity: 0;
+  will-change: transform, opacity, top, clip-path;
+}
+
+.spec-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.6em;
+  margin-bottom: 0.3em;
+}
+
+.spec-label {
+  flex: 1 1 auto;
+}
+
+.spec-value {
+  flex: 0 0 auto;
+  text-align: right;
+  white-space: nowrap;
+}
+
+/* Each group's box centers under its matching egg in section 6
+   (--s6-egg-left-x / --s6-egg-right-x), so the eggs read as sitting
+   directly above the two lists; the lines within stay left-aligned. */
+.text-fifth-left,
+.text-fifth-left-black {
+  left: var(--s6-egg-left-x);
   transform: translateX(-50%);
-  will-change: transform, opacity, top;
+}
+
+.text-fifth-right,
+.text-fifth-right-black {
+  left: var(--s6-egg-right-x);
+  transform: translateX(-50%);
+}
+
+.text-fifth-left,
+.text-fifth-right {
+  color: #fff;
+  z-index: 6;
+}
+
+/* Black copies sit directly beneath the white ones, exactly overlapping.
+   Only the white copies are clipped as section 6's background rises past
+   them, revealing the black text underneath wherever it's been covered. */
+.text-fifth-left-black,
+.text-fifth-right-black {
+  color: #000;
   z-index: 5;
 }
 
 @media (max-width: 768px), (max-aspect-ratio: 3/4) {
-  .text-fourth {
-    font-size: 8vw;
+  .text-fifth-left,
+  .text-fifth-right,
+  .text-fifth-left-black,
+  .text-fifth-right-black {
+    /* The two columns center 28vw apart (--s6-egg-left-x/right-x), so each
+       column's width has to stay well under that or the columns collide. */
+    width: 12vw;
+    font-size: 2.6vw;
+    line-height: 1.5;
+  }
+}
+
+/* ---------- section 6 (curtain + eggs, riding section 5's own pin) ---------- */
+
+/* Rises from fully below the viewport (translateY 100%) to fully covering
+   it (translateY 0), like a curtain drawing up over section 5's black. It's
+   a child of section 5 rather than its own pinned section, so the reveal
+   continues on the same continuous pin/scroll - no gap between the crack-egg
+   sequence finishing and the curtain starting to rise. */
+#section6-curtain {
+  position: absolute;
+  inset: 0;
+  background: rgb(245, 245, 245);
+  transform: translateY(100%);
+  will-change: transform;
+  z-index: 1;
+}
+
+.section6-egg {
+  position: fixed;
+  width: 13vw;
+  height: auto;
+  opacity: 0;
+  will-change: transform, opacity, bottom;
+  z-index: 4;
+  pointer-events: none;
+}
+
+.section6-egg-left {
+  left: var(--s6-egg-left-x);
+  transform: translate(-50%, 0);
+}
+
+.section6-egg-right {
+  left: var(--s6-egg-right-x);
+  transform: translate(-50%, 0);
+}
+
+@media (max-width: 768px), (max-aspect-ratio: 3/4) {
+  .section6-egg {
+    width: 28vw;
   }
 }

@@ -12,7 +12,7 @@ const SCROLL_VH_PER_FRAME = 4 / 150;
 
 // Section 2 gets twice as much scroll distance per frame as section 1 -
 // same frame sequence, but the viewer spends twice as long moving through it.
-const S2_SCROLL_MULTIPLIER = 2;
+const S2_SCROLL_MULTIPLIER = 3;
 
 function lerp(a: number, b: number, t: number) {
   return a + (b - a) * t;
@@ -83,7 +83,10 @@ const textBottom = document.querySelector(".text-bottom") as HTMLDivElement;
 const textSecond = document.querySelector(".text-second") as HTMLParagraphElement;
 const textSecondRight = document.querySelector(".text-second-right") as HTMLParagraphElement;
 const textThird = document.querySelector(".text-third") as HTMLParagraphElement;
-const textFourth = document.querySelector(".text-fourth") as HTMLParagraphElement;
+const textFifthLeft = document.querySelector(".text-fifth-left") as HTMLParagraphElement;
+const textFifthRight = document.querySelector(".text-fifth-right") as HTMLParagraphElement;
+const textFifthLeftBlack = document.querySelector(".text-fifth-left-black") as HTMLParagraphElement;
+const textFifthRightBlack = document.querySelector(".text-fifth-right-black") as HTMLParagraphElement;
 const titleEl = textTop.querySelector(".hero-title") as HTMLElement;
 const subtitleEl = textTop.querySelector(".hero-subtitle") as HTMLElement;
 
@@ -156,7 +159,7 @@ const P_SECOND_MOVE_END = frameToProgress(80, S2_FRAME_COUNT);
 const P_SECOND_FADE_OUT_START = frameToProgress(120, S2_FRAME_COUNT);
 const P_SECOND_FADE_OUT_END = frameToProgress(150, S2_FRAME_COUNT);
 
-const FIRST_BATCH_RISE_VH = 10;
+const FIRST_BATCH_RISE_VH = 5;
 
 const s2Canvas = document.getElementById("section2-canvas") as HTMLCanvasElement;
 const s2Ctx = s2Canvas.getContext("2d")!;
@@ -315,54 +318,144 @@ function updateSection3(progress: number) {
 }
 
 // ---------------------------------------------------------------------------
-// Section 4: crack-egg sequence (pinned, appears whole, no entrance slide)
+// Section 4: static light-flow image + copy (no canvas, no pin - it just
+// scrolls into view like an ordinary block, same as section 3's image wrap).
 // ---------------------------------------------------------------------------
 
-const S4_FRAME_COUNT = 300;
-const S4_FRAME_START = 262; // source files are frame_0262.jpg .. frame_0561.jpg
-const S4_REVEAL_END = frameToProgress(15, S4_FRAME_COUNT);
+// ---------------------------------------------------------------------------
+// Section 5: crack-egg sequence (pinned, appears whole, no entrance slide)
+// ---------------------------------------------------------------------------
 
-const S4_TEXT_FADE_IN_START = frameToProgress(90, S4_FRAME_COUNT);
-const S4_TEXT_FADE_IN_END = frameToProgress(130, S4_FRAME_COUNT);
-const S4_TEXT_FALL_END = frameToProgress(220, S4_FRAME_COUNT);
+const S5_FRAME_COUNT = 300;
+const S5_FRAME_START = 262; // source files are frame_0262.jpg .. frame_0561.jpg
+const S5_REVEAL_END = frameToProgress(15, S5_FRAME_COUNT);
 
-const s4Canvas = document.getElementById("section4-canvas") as HTMLCanvasElement;
-const s4Ctx = s4Canvas.getContext("2d")!;
-let s4Images: HTMLImageElement[] = [];
+const S5_TEXT_FADE_IN_START = frameToProgress(90, S5_FRAME_COUNT);
+const S5_TEXT_FADE_IN_END = frameToProgress(130, S5_FRAME_COUNT);
+const S5_TEXT_FALL_END = frameToProgress(220, S5_FRAME_COUNT);
 
-let s4TextTopStartPx = 0;
-let s4TextTopEndPx = 0;
+const s5Canvas = document.getElementById("section5-canvas") as HTMLCanvasElement;
+const s5Ctx = s5Canvas.getContext("2d")!;
+let s5Images: HTMLImageElement[] = [];
 
-function measureSection4Layout() {
-  s4TextTopStartPx = window.innerHeight / 3;
-  s4TextTopEndPx = (window.innerHeight * 2) / 3;
+let s5TextTopStartPx = 0;
+let s5TextTopEndPx = 0;
+// Measured separately - the left and right groups hold different numbers of
+// lines, so they don't share a height.
+let s5TextLeftHeightPx = 0;
+let s5TextRightHeightPx = 0;
+
+function measureSection5Layout() {
+  s5TextTopStartPx = window.innerHeight / 3;
+  s5TextTopEndPx = (window.innerHeight * 2) / 3;
+  s5TextLeftHeightPx = textFifthLeft.getBoundingClientRect().height;
+  s5TextRightHeightPx = textFifthRight.getBoundingClientRect().height;
 }
 
-function updateSection4(progress: number) {
-  const frameIndex = clamp(Math.round(progress * (S4_FRAME_COUNT - 1)), 0, S4_FRAME_COUNT - 1);
-  drawFrame(s4Ctx, s4Images[frameIndex]);
+function updateSection5(progress: number) {
+  const frameIndex = clamp(Math.round(progress * (S5_FRAME_COUNT - 1)), 0, S5_FRAME_COUNT - 1);
+  drawFrame(s5Ctx, s5Images[frameIndex]);
 
   // Unlike section 3, the frame appears fully in place from the start (no
   // slide-in) - it just fades up from black over the first 15 frames.
-  const revealT = clamp(progress / S4_REVEAL_END, 0, 1);
-  s4Canvas.style.opacity = `${revealT}`;
+  const revealT = clamp(progress / S5_REVEAL_END, 0, 1);
+  s5Canvas.style.opacity = `${revealT}`;
 
   const fadeT = clamp(
-    (progress - S4_TEXT_FADE_IN_START) / (S4_TEXT_FADE_IN_END - S4_TEXT_FADE_IN_START),
+    (progress - S5_TEXT_FADE_IN_START) / (S5_TEXT_FADE_IN_END - S5_TEXT_FADE_IN_START),
     0,
     1,
   );
-  textFourth.style.opacity = `${fadeT}`;
 
   // Holds at the top-third mark while fading in, then falls to the
-  // bottom-third mark between the fade-in completing and frame 220.
+  // bottom-third mark between the fade-in completing and frame 220. The
+  // black copies stay exactly stacked under the white ones throughout -
+  // section 6 is what later pulls them apart via clip-path.
   const fallT = clamp(
-    (progress - S4_TEXT_FADE_IN_END) / (S4_TEXT_FALL_END - S4_TEXT_FADE_IN_END),
+    (progress - S5_TEXT_FADE_IN_END) / (S5_TEXT_FALL_END - S5_TEXT_FADE_IN_END),
     0,
     1,
   );
-  const top = lerp(s4TextTopStartPx, s4TextTopEndPx, fallT);
-  textFourth.style.top = `${top}px`;
+  const top = lerp(s5TextTopStartPx, s5TextTopEndPx, fallT);
+
+  for (const el of [textFifthLeft, textFifthRight, textFifthLeftBlack, textFifthRightBlack]) {
+    el.style.opacity = `${fadeT}`;
+    el.style.top = `${top}px`;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Section 6: gray curtain rises over section 5's text, then two eggs fade in
+//
+// This rides section 5's own pin/scroll rather than getting a separate
+// ScrollTrigger - GSAP's default pinSpacing reserves a full extra viewport
+// height after any pinned section unpins, so two consecutive pins leave a
+// "dead" gap where nothing animates. Folding this into one continuous pin
+// (see the combined onUpdate in init()) makes the curtain start rising the
+// instant section 5's reveal finishes, with no seam in between.
+// ---------------------------------------------------------------------------
+
+// Section 5's text ends its fall holding at the bottom-third mark and never
+// moves again - section 6 reuses that same top/height rather than
+// re-measuring, so the two sections agree on exactly where the text sits.
+const S6_CURTAIN_END = 0.5;
+const S6_EGG_FADE_START = 0.6;
+const S6_EGG_FADE_END = 1;
+const S6_EGG_RISE_PX = 24;
+
+const s6Curtain = document.getElementById("section6-curtain") as HTMLDivElement;
+const s6EggLeft = document.getElementById("section6-egg-left") as HTMLImageElement;
+const s6EggRight = document.getElementById("section6-egg-right") as HTMLImageElement;
+
+let s6EggBottomPx = 0;
+
+function measureSection6Layout() {
+  const gapPx = window.innerHeight * 0.04;
+  s6EggBottomPx = window.innerHeight - s5TextTopEndPx + gapPx;
+}
+
+function updateSection6(progress: number) {
+  // Curtain rises from fully below the viewport to fully covering it.
+  const curtainT = clamp(progress / S6_CURTAIN_END, 0, 1);
+  const curtainTranslateYPercent = lerp(100, 0, curtainT);
+  s6Curtain.style.transform = `translateY(${curtainTranslateYPercent}%)`;
+
+  // Where the curtain's top edge currently sits, in viewport pixels.
+  const curtainTopPx = (curtainTranslateYPercent / 100) * window.innerHeight;
+
+  // The white copies get clipped to only the portion still above the
+  // curtain; the black copies beneath are always fully rendered, so they
+  // show through wherever the white has been clipped away. Where the
+  // curtain hasn't reached the text yet, the clip is a no-op (bottom: 0)
+  // and the white copy covers the black one completely. Computed per column
+  // since the two groups hold different numbers of lines (different heights).
+  const leftSplitPx = clamp(curtainTopPx - s5TextTopEndPx, 0, s5TextLeftHeightPx);
+  textFifthLeft.style.clipPath = `inset(0px 0px ${s5TextLeftHeightPx - leftSplitPx}px 0px)`;
+
+  const rightSplitPx = clamp(curtainTopPx - s5TextTopEndPx, 0, s5TextRightHeightPx);
+  textFifthRight.style.clipPath = `inset(0px 0px ${s5TextRightHeightPx - rightSplitPx}px 0px)`;
+
+  // Once the background has fully turned gray, the two eggs gradually
+  // surface just above the text.
+  const eggT = clamp((progress - S6_EGG_FADE_START) / (S6_EGG_FADE_END - S6_EGG_FADE_START), 0, 1);
+  // Starts slightly below the resting spot and settles upward into place.
+  const eggRisePx = lerp(S6_EGG_RISE_PX, 0, eggT);
+  s6EggLeft.style.opacity = `${eggT}`;
+  s6EggRight.style.opacity = `${eggT}`;
+  s6EggLeft.style.bottom = `${s6EggBottomPx - eggRisePx}px`;
+  s6EggRight.style.bottom = `${s6EggBottomPx - eggRisePx}px`;
+}
+
+// Section 5 and 6 share one pin: the crack-egg sequence gets the same scroll
+// distance it always had (S5_PHASE_SCROLL_VH), and the curtain/egg reveal
+// gets its own stretch tacked on immediately after (S6_PHASE_SCROLL_VH).
+const S5_PHASE_SCROLL_VH = SCROLL_VH_PER_FRAME * S5_FRAME_COUNT;
+const S6_PHASE_SCROLL_VH = 2;
+const S5_PHASE_END = S5_PHASE_SCROLL_VH / (S5_PHASE_SCROLL_VH + S6_PHASE_SCROLL_VH);
+
+function updateSection5And6(progress: number) {
+  updateSection5(clamp(progress / S5_PHASE_END, 0, 1));
+  updateSection6(clamp((progress - S5_PHASE_END) / (1 - S5_PHASE_END), 0, 1));
 }
 
 // ---------------------------------------------------------------------------
@@ -370,23 +463,24 @@ function updateSection4(progress: number) {
 async function init() {
   resizeCanvas(s1Canvas, s1Ctx);
   resizeCanvas(s2Canvas, s2Ctx);
-  resizeCanvas(s4Canvas, s4Ctx);
+  resizeCanvas(s5Canvas, s5Ctx);
   measureTextLayout();
   measureSection3Layout();
-  measureSection4Layout();
+  measureSection5Layout();
+  measureSection6Layout();
   updateSection1(0);
   updateSection3(0);
-  updateSection4(0);
+  updateSection5And6(0);
 
   let s1Loaded = 0;
   let s2Loaded = 0;
-  let s4Loaded = 0;
-  const totalFrames = S1_FRAME_COUNT + S2_FRAME_COUNT + S4_FRAME_COUNT;
+  let s5Loaded = 0;
+  const totalFrames = S1_FRAME_COUNT + S2_FRAME_COUNT + S5_FRAME_COUNT;
   const updateLoader = () => {
-    loaderFill.style.width = `${((s1Loaded + s2Loaded + s4Loaded) / totalFrames) * 100}%`;
+    loaderFill.style.width = `${((s1Loaded + s2Loaded + s5Loaded) / totalFrames) * 100}%`;
   };
 
-  const [s1Result, s2Result, s4Result] = await Promise.all([
+  const [s1Result, s2Result, s5Result] = await Promise.all([
     preloadImages("/egg", S1_FRAME_COUNT, (loaded) => {
       s1Loaded = loaded;
       updateLoader();
@@ -397,22 +491,24 @@ async function init() {
     }),
     preloadImages(
       "/crack_egg",
-      S4_FRAME_COUNT,
+      S5_FRAME_COUNT,
       (loaded) => {
-        s4Loaded = loaded;
+        s5Loaded = loaded;
         updateLoader();
       },
-      S4_FRAME_START,
+      S5_FRAME_START,
     ),
   ]);
   s1Images = s1Result;
   s2Images = s2Result;
-  s4Images = s4Result;
+  s5Images = s5Result;
 
   updateSection1(0);
   measureTextLayout();
   updateSection2(0);
-  updateSection4(0);
+  measureSection5Layout();
+  measureSection6Layout();
+  updateSection5And6(0);
   loader.classList.add("is-hidden");
 
   ScrollTrigger.create({
@@ -452,23 +548,24 @@ async function init() {
   });
 
   ScrollTrigger.create({
-    trigger: "#section4",
+    trigger: "#section5",
     start: "top top",
-    end: `+=${window.innerHeight * SCROLL_VH_PER_FRAME * S4_FRAME_COUNT}`,
+    end: `+=${window.innerHeight * (S5_PHASE_SCROLL_VH + S6_PHASE_SCROLL_VH)}`,
     pin: true,
     anticipatePin: 1,
     scrub: 0.4,
-    onUpdate: (self) => updateSection4(self.progress),
-    onEnter: () => updateSection4(0),
+    onUpdate: (self) => updateSection5And6(self.progress),
+    onEnter: () => updateSection5And6(0),
   });
 
   window.addEventListener("resize", () => {
     resizeCanvas(s1Canvas, s1Ctx);
     resizeCanvas(s2Canvas, s2Ctx);
-    resizeCanvas(s4Canvas, s4Ctx);
+    resizeCanvas(s5Canvas, s5Ctx);
     measureTextLayout();
     measureSection3Layout();
-    measureSection4Layout();
+    measureSection5Layout();
+    measureSection6Layout();
     ScrollTrigger.refresh();
   });
 
