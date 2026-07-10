@@ -371,10 +371,11 @@ body {
 
 /* ---------- section 3 ---------- */
 
-/* Black rather than white - now that the section is pinned (see below), this
-   is what's exposed behind the image before it arrives (and after it
-   leaves), so it needs to match section 2's black backdrop rather than the
-   image's own light tone. */
+/* Background is driven from JS (see updateSection3) - now that the section
+   is pinned (see below), this is what's exposed behind the image whenever
+   it's not fully covering the viewport (arriving or leaving), so it has to
+   switch between section 2's black and section 4's light tone rather than
+   staying one flat color. #000 here is just the initial/fallback value. */
 .section3 {
   position: relative;
   height: 100vh;

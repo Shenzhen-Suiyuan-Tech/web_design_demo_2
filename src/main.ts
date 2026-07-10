@@ -371,7 +371,19 @@ const S3_TEXT_FADE_IN_END = S3_TOP_REACHED * 0.75; // image 75% slid in
 // image reaches that mark.
 const S3_SECOND_TEXT_GONE_BY = S3_SLIDE_IN_END * 0.5;
 
+const s3El = document.getElementById("section3") as HTMLElement;
 const s3ImageWrap = document.getElementById("section3-image-wrap") as HTMLDivElement;
+
+// section3's own backdrop - visible only in the sliver exposed behind the
+// image while it's not fully covering the viewport (during the slide in/out,
+// since the wrap holds a fixed 100vh height but its top offset moves).
+// Black during the approach so it matches section 2's black tail; switched
+// to section 4's own background right as the hold ends and the exit slide
+// begins, so it's already the right color by the time that sliver starts
+// growing again on the way out - the flip itself lands while the image is
+// still fully covering the screen (progress === S3_HOLD_END is exactly full
+// coverage), so it's invisible when it happens.
+const S3_EXIT_BG = "rgb(244, 248, 250)";
 
 let s3TextHeightPx = 0;
 
@@ -380,6 +392,8 @@ function measureSection3Layout() {
 }
 
 function updateSection3(progress: number) {
+  s3El.style.backgroundColor = progress < S3_HOLD_END ? "#000" : S3_EXIT_BG;
+
   // Uniform scale for the whole pass through the section: 150% -> 100%.
   // Driven by raw scroll progress throughout, so it never stalls alongside
   // the image's hold below.
