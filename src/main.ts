@@ -466,6 +466,21 @@ let s5Images: HTMLImageElement[] = [];
 // snap right as the pin engages.
 let s5PreRevealOpacity = 0;
 
+// The absolute scroll position at which section 5's pin would naturally
+// engage (its top reaching the viewport top under normal document flow).
+// Measured once via measureSection5PinStart(), after every earlier
+// section's pin-spacer already exists, and then compared against raw
+// window.scrollY during scroll rather than re-measuring s5El's own rect
+// live - anticipatePin (see the pin trigger below) can start visually
+// pinning section 5 slightly before the raw scroll position actually
+// reaches this point, which made a live rect.top-based version of this
+// ramp (the previous implementation) freeze partway through, leaving a
+// dim, half-faded canvas right at the section 4/5 seam.
+let s5PinStartScrollY = 0;
+function measureSection5PinStart() {
+  s5PinStartScrollY = s5El.getBoundingClientRect().top + window.scrollY;
+}
+
 // Whether section 5's own pin trigger currently considers itself active,
 // based on the raw scroll position (set from onEnter/onEnterBack/onLeave/
 // onLeaveBack in init()). Needed because with scrub easing, onUpdate can
@@ -478,26 +493,35 @@ let s5PreRevealOpacity = 0;
 // plain black box) for a full viewport height of scrolling, reading as a
 // long dead-black stretch, and the nav would only flip dark once section 5
 // covers the *entire* viewport rather than just the nav's own strip at the
-// top. Both are corrected here, driven directly off section 5's live
-// position on every scroll tick; once truly pinned (rect.top <= 0) this
-// hands off entirely to updateSection5/updateSection6.
-let s5PrevTop = Infinity;
+// top. Both are corrected here, driven off raw scroll position (via
+// s5PinStartScrollY) on every scroll tick; once truly pinned this hands off
+// entirely to updateSection5/updateSection6.
+let s5PrevDistance = Infinity;
 function updateSection5PreEntry() {
-  const rect = s5El.getBoundingClientRect();
   const h = window.innerHeight;
-  // Only while actually approaching (top decreasing) - otherwise, right
-  // after leaving the pin backward, top starts at ~0 and briefly satisfies
-  // the "close enough" check below while really just retreating, which
-  // would wrongly re-flip the nav dark the instant section 4 correctly set
-  // it back to light.
-  const approaching = rect.top < s5PrevTop;
-  if (rect.top > 0) {
-    const slideT = clamp(1 - rect.top / h, 0, 1);
+  const distanceToTop = s5PinStartScrollY - window.scrollY;
+  // Only while actually approaching (distance decreasing) - otherwise, right
+  // after leaving the pin backward, distance starts at ~0 and briefly
+  // satisfies the "close enough" check below while really just retreating,
+  // which would wrongly re-flip the nav dark the instant section 4 correctly
+  // set it back to light.
+  const approaching = distanceToTop < s5PrevDistance;
+  if (distanceToTop > 0) {
+    const slideT = clamp(1 - distanceToTop / h, 0, 1);
     s5PreRevealOpacity = slideT * 0.6;
     s5Canvas.style.opacity = `${s5PreRevealOpacity}`;
-    if (approaching && rect.top <= h * 0.05) setNavDark(true);
+    if (approaching && distanceToTop <= h * 0.05) setNavDark(true);
+  } else if (s5PrevDistance > 0) {
+    // Just crossed the threshold - possibly in one large jump if scroll
+    // events were coalesced during a fast scroll, which would otherwise
+    // leave s5PreRevealOpacity stuck at whatever partial value the last
+    // event before the crossing had computed. Finish the ramp properly
+    // instead, so the pin's own reveal (see updateSection5) always hands
+    // off from the full 0.6 rather than an arbitrary lower value.
+    s5PreRevealOpacity = 0.6;
+    s5Canvas.style.opacity = `${s5PreRevealOpacity}`;
   }
-  s5PrevTop = rect.top;
+  s5PrevDistance = distanceToTop;
 }
 
 let s5TextTopStartPx = 0;
@@ -704,8 +728,6 @@ async function init() {
   measureSection5Layout();
   measureSection6Layout();
   updateSection5And6(0);
-  updateSection5PreEntry();
-  window.addEventListener("scroll", updateSection5PreEntry, { passive: true });
   loader.classList.add("is-hidden");
 
   ScrollTrigger.create({
@@ -784,6 +806,14 @@ async function init() {
     },
   });
 
+  // Section 1/2/3's pin-spacers all exist by now, so section 5's natural
+  // (unpinned) position already accounts for their reserved scroll height -
+  // this has to happen after they're created, not up in the earlier
+  // measure/update block above.
+  measureSection5PinStart();
+  updateSection5PreEntry();
+  window.addEventListener("scroll", updateSection5PreEntry, { passive: true });
+
   ScrollTrigger.create({
     trigger: "#section5",
     start: "top top",
@@ -832,6 +862,9 @@ async function init() {
     measureSection5Layout();
     measureSection6Layout();
     ScrollTrigger.refresh();
+    // Refresh above may have shifted section 5's natural position (e.g. if
+    // section 4's height reflowed), so this has to come after it.
+    measureSection5PinStart();
   });
 
 }
