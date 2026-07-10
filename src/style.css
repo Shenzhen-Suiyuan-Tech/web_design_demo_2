@@ -2,6 +2,7 @@
   --section2-bg: #000;
   --s6-egg-left-x: 36%;
   --s6-egg-right-x: 64%;
+  --s6-spec-width: 13.5vw;
 }
 
 * {
@@ -38,7 +39,6 @@ body {
   align-items: center;
   justify-content: space-between;
   width: 83.3333%;
-  max-width: 1166px;
   margin: 0 auto;
   height: 5vh;
 }
@@ -358,7 +358,7 @@ body {
 
 .text-third {
   position: fixed;
-  left: 33.333vw;
+  left: 50%;
   top: 0;
   margin: 0;
   width: fit-content;
@@ -369,6 +369,7 @@ body {
   letter-spacing: -0.02em;
   white-space: nowrap;
   opacity: 0;
+  transform: translateX(-50%);
   will-change: transform, opacity, top;
   z-index: 5;
 }
@@ -377,6 +378,7 @@ body {
   .text-third {
     left: 10vw;
     font-size: 8vw;
+    transform: none;
   }
 }
 
@@ -481,7 +483,7 @@ body {
   position: fixed;
   top: 0;
   margin: 0;
-  width: 11.111vw;
+  width: var(--s6-spec-width);
   font-size: 1.6vh;
   line-height: 1.7;
   font-weight: 500;
@@ -535,20 +537,63 @@ body {
    them, revealing the black text underneath wherever it's been covered. */
 .text-fifth-left-black,
 .text-fifth-right-black {
-  color: #000;
+  color: #6b6b6b;
   z-index: 5;
+}
+
+/* Titles sit between each egg and its spec list, sharing the exact same
+   width/centering as the spec columns below so their left edges line up. */
+.text-sixth-title-left,
+.text-sixth-title-right {
+  position: fixed;
+  top: 0;
+  margin: 0;
+  width: var(--s6-spec-width);
+  font-size: 2.4vh;
+  line-height: 1.2;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: #000;
+  text-align: left;
+  white-space: nowrap;
+  opacity: 0;
+  z-index: 6;
+  will-change: opacity, top;
+}
+
+.text-sixth-title-left {
+  left: var(--s6-egg-left-x);
+  transform: translateX(-50%);
+}
+
+.text-sixth-title-right {
+  left: var(--s6-egg-right-x);
+  transform: translateX(-50%);
 }
 
 @media (max-width: 768px), (max-aspect-ratio: 3/4) {
   .text-fifth-left,
   .text-fifth-right,
   .text-fifth-left-black,
-  .text-fifth-right-black {
+  .text-fifth-right-black,
+  .text-sixth-title-left,
+  .text-sixth-title-right {
     /* The two columns center 28vw apart (--s6-egg-left-x/right-x), so each
        column's width has to stay well under that or the columns collide. */
     width: 12vw;
+  }
+
+  .text-fifth-left,
+  .text-fifth-right,
+  .text-fifth-left-black,
+  .text-fifth-right-black {
     font-size: 2.6vw;
     line-height: 1.5;
+  }
+
+  .text-sixth-title-left,
+  .text-sixth-title-right {
+    font-size: 3.4vw;
   }
 }
 

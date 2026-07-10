@@ -347,7 +347,10 @@ let s5TextRightHeightPx = 0;
 
 function measureSection5Layout() {
   s5TextTopStartPx = window.innerHeight / 3;
-  s5TextTopEndPx = (window.innerHeight * 2) / 3;
+  // Slightly above the 2/3 mark - this is also where section 6's egg/title/
+  // spec block ends up resting, so nudging it up here shifts that whole
+  // group up too, with no seam since section 6 reuses this same value.
+  s5TextTopEndPx = window.innerHeight * 0.63;
   s5TextLeftHeightPx = textFifthLeft.getBoundingClientRect().height;
   s5TextRightHeightPx = textFifthRight.getBoundingClientRect().height;
 }
@@ -406,12 +409,18 @@ const S6_EGG_RISE_PX = 24;
 const s6Curtain = document.getElementById("section6-curtain") as HTMLDivElement;
 const s6EggLeft = document.getElementById("section6-egg-left") as HTMLImageElement;
 const s6EggRight = document.getElementById("section6-egg-right") as HTMLImageElement;
+const s6TitleLeft = document.querySelector(".text-sixth-title-left") as HTMLParagraphElement;
+const s6TitleRight = document.querySelector(".text-sixth-title-right") as HTMLParagraphElement;
 
 let s6EggBottomPx = 0;
+let s6TitleTopPx = 0;
 
 function measureSection6Layout() {
-  const gapPx = window.innerHeight * 0.04;
-  s6EggBottomPx = window.innerHeight - s5TextTopEndPx + gapPx;
+  const titleGapPx = window.innerHeight * 0.02;
+  const eggGapPx = window.innerHeight * 0.04;
+  const titleHeightPx = s6TitleLeft.getBoundingClientRect().height;
+  s6TitleTopPx = s5TextTopEndPx - titleGapPx - titleHeightPx;
+  s6EggBottomPx = window.innerHeight - s6TitleTopPx + eggGapPx;
 }
 
 function updateSection6(progress: number) {
@@ -444,6 +453,13 @@ function updateSection6(progress: number) {
   s6EggRight.style.opacity = `${eggT}`;
   s6EggLeft.style.bottom = `${s6EggBottomPx - eggRisePx}px`;
   s6EggRight.style.bottom = `${s6EggBottomPx - eggRisePx}px`;
+
+  // Titles fade in alongside the eggs, holding at their fixed spot between
+  // the eggs and the spec lists.
+  s6TitleLeft.style.opacity = `${eggT}`;
+  s6TitleRight.style.opacity = `${eggT}`;
+  s6TitleLeft.style.top = `${s6TitleTopPx}px`;
+  s6TitleRight.style.top = `${s6TitleTopPx}px`;
 }
 
 // Section 5 and 6 share one pin: the crack-egg sequence gets the same scroll
